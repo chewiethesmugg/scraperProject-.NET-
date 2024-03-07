@@ -4,6 +4,8 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using Microsoft.VisualBasic;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace scraperProject
 {
@@ -18,57 +20,61 @@ namespace scraperProject
         
         
         //we pass in a theme as a String
-        static void Main(String[] args)
+        static async Task Main(String[] args)
         {
-            Console.WriteLine("Welcome to Image Extractor 9000!");
+            Console.WriteLine("Welcome to Image Extractor 9000!");   
 
             var targetUrl = "";
-            while (targetUrl != "STOP")
+            var fileToDelete = "";
+            var pictureFolder = "";
+
+            //select right url from theme here
+            targetUrl = "http://www.speedhunters.com/";
+            //check if the folder has been updated within the last 
+            //var folder = "C:\\Users\\chewie\\Desktop\\test_images";
+            Console.WriteLine("got here");
+            pictureFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)+ "\\scraperImages";
+            Console.WriteLine(pictureFolder.ToString());
+
+            bool renew = outDated(pictureFolder);
+
+
+            //if folder was renewed within 7 days
+            //pick random image
+            if (!renew)
             {
-                Console.WriteLine("Please enter the SpeedHunters URl to scrape (type STOP to exit!):");
-                targetUrl = Console.ReadLine();
-                if (targetUrl == "STOP")
-                {
-                    Console.WriteLine("Thank you for using the Image Extractor 9000!");
-                    break;
-                }
-                targetUrl = "http://www.speedhunters.com/";
-                //check if the folder has been updated within the last 
-                var folder = "C:\\Users\\chewie\\Desktop\\test_images";
-                bool renew = outDated(folder);
-
-                //if folder was renewed within 7 days
-                //pick random image
-                if (renew)
-                {
-                    Console.WriteLine("Just picking random image");
-                    setDesktop(folder);
-                }
-               
-                else
-                {
-                    Console.WriteLine("getting new images");
-                    //get a random article to scrape
-                    string page = getArticle(targetUrl);
-                    List<string> images = parseHtml(page);
-
-                    //download the images to a directory
-                    var done = downloadImages(folder, images);
-                    //set image
-                    setDesktop(folder);
-                }
+                Console.WriteLine("getting new images");
+                //get a random article to scrape
+                string page = getArticle(targetUrl);
+                List<string> images;
+                images = parseHtml(page);
+                Boolean imagesDownloaded = await downloadImages(pictureFolder, images);
+               setDesktop(pictureFolder);
+            }
+            else
+            {
+                setDesktop(pictureFolder);
             }
         }
 
+        //checks if folder not empty
         //returns a boolean indicating if the images are outdated
         //returns true if images were modified within last 7 days
         //returns false otherwise
         private static bool outDated(string folder)
         {
+            //check if empty first
+            var currentFiles = Directory.GetFiles(folder);
+            Console.WriteLine(currentFiles.Length);
+            if(currentFiles.Length <= 2) {
+                Console.WriteLine("empty folder");
+                return false; 
+            }
+
             DateTime curr = DateTime.Now;
             var lastModified = System.IO.File.GetLastWriteTime(folder);
             var delta = curr - lastModified;
-            Console.WriteLine(delta.ToString());
+            Console.WriteLine(delta.Days);
             if (delta.Days <= 7) { return true; }
             return false;
         }
@@ -107,6 +113,8 @@ namespace scraperProject
             }
             return imgLinks;
         }
+        
+        //just your average random function
         private static int getRandom(int max)
         {
             Random random = new Random();
@@ -119,7 +127,7 @@ namespace scraperProject
         //for rn its a default site of speedhunters
         private static string getArticle(string target)
         {
-            Console.WriteLine("Getting random article");
+             Console.WriteLine("Getting random article");
             //we have a good URl so we make a request and store the response
             string page = requestPage(target).Result;
             HtmlDocument doc = new HtmlDocument();
@@ -136,7 +144,7 @@ namespace scraperProject
         }
         
         //downloading the image from the URL
-        private static async Task<bool> downloadImages(string filePath, List<string> links)
+        private static async Task<Boolean> downloadImages(string filePath, List<string> links)
         {
             var HttpClient = new HttpClient();
             if (!Directory.Exists(filePath))
@@ -161,19 +169,19 @@ namespace scraperProject
             return true;
         }
 
-        //update the background image
-        //pick a random one from the availables
-        //delete that photo afterwards
+        //pick a random one from the available images
+        //update background
+        //deletes image
         public static void setDesktop(String folderPath) {
             Console.WriteLine("Setting Desktop Wallpaper");
-            //getting a random image and its path
-            int fileCount = Directory.GetFiles(folderPath, "*.jpg", SearchOption.TopDirectoryOnly).Length;
-            int index = getRandom(fileCount);
-            string imagePath = folderPath + @"\image"+index+".jpg";
+            var rand = new Random();
+            var files = Directory.GetFiles(folderPath);
+            //Console.WriteLine(files.ToString);
+            var imagePath = files[rand.Next(files.Length)-1];
+            Console.WriteLine(imagePath);
             //updating the desktop
-            SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, imagePath, SPIF_UPDATEINFILE);
-            //deleting the image afterwards
-            File.Delete(imagePath);
+            SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, imagePath, SPIF_UPDATEINFILE | SPIF_SENDCHANGE);
+            System.IO.File.Delete(imagePath);
         }
     }
 }
